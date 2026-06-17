@@ -5,13 +5,20 @@ export async function GET() {
   const session = await requireConsoleAccess();
   if (!session) return forbidden("Console access required.");
 
-  const snap = await db()
-    .collection("sessions")
-    .where("status", "in", ["open", "locked"])
-    .orderBy("createdAt", "desc")
-    .get();
+  try {
+    const snap = await db()
+      .collection("sessions")
+      .where("status", "in", ["open", "locked"])
+      .orderBy("createdAt", "desc")
+      .get();
 
-  const sessions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const sessions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  return Response.json({ sessions });
+    return Response.json({ sessions });
+  } catch (e) {
+    return Response.json(
+      { error: String(e?.message || e), sessions: [] },
+      { status: 500 }
+    );
+  }
 }
