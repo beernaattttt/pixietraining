@@ -2,6 +2,8 @@ import { db } from "../../../../lib/firebaseAdmin";
 import { requireConsoleAccess, forbidden } from "../../../../lib/requireAuth";
 import { audit } from "../../../../lib/audit";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Granting permissions is itself a privileged action gated tighter than
  * normal console access: only superAdmin can grant/revoke. This matches

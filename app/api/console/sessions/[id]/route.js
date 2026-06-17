@@ -2,6 +2,8 @@ import { db } from "../../../../../lib/firebaseAdmin";
 import { requireConsoleAccess, forbidden } from "../../../../../lib/requireAuth";
 import { audit } from "../../../../../lib/audit";
 
+export const dynamic = "force-dynamic";
+
 const VALID_ACTIONS = ["lock", "open", "close", "rate", "kick"];
 const VALID_RATINGS = ["passed", "failed"];
 

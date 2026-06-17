@@ -1,6 +1,8 @@
 import { db } from "../../../../lib/firebaseAdmin";
 import { requireConsoleAccess, forbidden } from "../../../../lib/requireAuth";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const session = await requireConsoleAccess();
   if (!session) return forbidden("Console access required.");

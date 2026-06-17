@@ -2,6 +2,8 @@ import { db } from "../../../../lib/firebaseAdmin";
 import { requireConsoleAccess, forbidden } from "../../../../lib/requireAuth";
 import { audit } from "../../../../lib/audit";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Lets a signed-in staff member link their own Roblox account by typing
  * their username. We resolve it to a real numeric userId via Roblox's

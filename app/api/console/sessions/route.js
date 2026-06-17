@@ -1,6 +1,10 @@
 import { db } from "../../../../lib/firebaseAdmin";
 import { requireConsoleAccess, forbidden } from "../../../../lib/requireAuth";
 
+// This route reads the session (cookies) on every request — it must
+// never be statically rendered/cached at build time.
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const session = await requireConsoleAccess();
   if (!session) return forbidden("Console access required.");
