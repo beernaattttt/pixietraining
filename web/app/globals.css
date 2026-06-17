@@ -1,0 +1,56 @@
+/* Pixie Productions Training Console
+   Design direction: operational control-room clarity, not a marketing page.
+   This is a tool managers use to run live sessions and make pass/fail
+   calls on real people — it should read like ride-ops software (clear
+   states, dense information, decisive actions), not a themed/spooky page.
+   Forced light mode. No gradients, no glassmorphism, no emoji. */
+
+:root {
+  --ink: #14140f;
+  --paper: #faf8f2;
+  --line: #ddd8c8;
+  --panel: #ffffff;
+  --signal-amber: #c97a1a;   /* open / attention */
+  --signal-green: #2f6b46;   /* passed / active */
+  --signal-red: #a23b2e;     /* failed / kicked / closed */
+  --mute: #6b6a5d;
+
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  font-synthesis: none;
+  color-scheme: light only;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+input {
+  font-family: var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
