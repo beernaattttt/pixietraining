@@ -1,12 +1,16 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { signOut } from "next-auth/react";
+import Link from "next/link";
 import SessionCard from "./SessionCard";
+import LinkRobloxAccount from "./LinkRobloxAccount";
 
 export default function ConsoleClient({ user }) {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [robloxUserId, setRobloxUserId] = useState(user.robloxUserId);
+  const [robloxUsername, setRobloxUsername] = useState(user.robloxUsername);
 
   const load = useCallback(async () => {
     try {
@@ -70,21 +74,40 @@ export default function ConsoleClient({ user }) {
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 13, marginBottom: 4 }}>{user.username}</div>
-          <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            style={{
-              fontSize: 12,
-              color: "var(--mute)",
-              background: "none",
-              border: "none",
-              padding: 0,
-              textDecoration: "underline",
-            }}
-          >
-            Sign out
-          </button>
+          <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+            {user.superAdmin && (
+              <Link
+                href="/people"
+                style={{ fontSize: 12, color: "var(--mute)", textDecoration: "underline" }}
+              >
+                People
+              </Link>
+            )}
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              style={{
+                fontSize: 12,
+                color: "var(--mute)",
+                background: "none",
+                border: "none",
+                padding: 0,
+                textDecoration: "underline",
+              }}
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       </header>
+
+      <LinkRobloxAccount
+        robloxUserId={robloxUserId}
+        robloxUsername={robloxUsername}
+        onLinked={(id, name) => {
+          setRobloxUserId(id);
+          setRobloxUsername(name);
+        }}
+      />
 
       {loading && <p style={{ color: "var(--mute)" }}>Loading…</p>}
       {error && <p style={{ color: "var(--signal-red)" }}>{error}</p>}

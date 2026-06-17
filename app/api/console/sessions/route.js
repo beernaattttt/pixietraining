@@ -16,6 +16,9 @@ export async function GET() {
 
     return Response.json({ sessions });
   } catch (e) {
+    // Surface the real Firestore error (often a missing composite index,
+    // which Firestore reports with a direct "create it here" link) instead
+    // of a bare 500 with no information.
     return Response.json(
       { error: String(e?.message || e), sessions: [] },
       { status: 500 }
