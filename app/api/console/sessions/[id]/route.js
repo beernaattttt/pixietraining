@@ -30,7 +30,7 @@ export async function POST(req, { params }) {
 
   const { id } = params;
   const body = await req.json().catch(() => null);
-  const { action, robloxUserId, rating, banScope, code, maxTrainees } = body || {};
+  const { action, robloxUserId, rating, banScope, code, maxTrainees, reason } = body || {};
 
   if (!VALID_ACTIONS.includes(action)) {
     return new Response(JSON.stringify({ error: "Invalid action" }), { status: 400 });
@@ -66,8 +66,9 @@ export async function POST(req, { params }) {
   // Managers can still enter a locked session regardless (enforced in
   // join-session, not here).
   if (action === "lock" || action === "open" || action === "close") {
+    const statusMap = { lock: "locked", open: "open", close: "closed" };
     await ref.update({
-      status: action === "close" ? "closed" : action,
+      status: statusMap[action],
       ...(action === "close" ? { closedAt: new Date().toISOString() } : {}),
     });
     await appendSessionEvent(id, {
@@ -137,12 +138,14 @@ export async function POST(req, { params }) {
       [`trainees.${robloxUserId}.ratedBy`]: session.user.discordId,
       [`trainees.${robloxUserId}.ratedAt`]: new Date().toISOString(),
       [`trainees.${robloxUserId}.pendingAction`]: "kick",
+      [`trainees.${robloxUserId}.reason`]: reason || "",
     });
     await appendSessionEvent(id, {
       type: "kicked",
       robloxUserId: String(robloxUserId),
       username: data.trainees?.[robloxUserId]?.username || null,
       by: session.user.discordId,
+      meta: { reason: reason || "" },
     });
   }
 
@@ -160,6 +163,7 @@ export async function POST(req, { params }) {
       [`trainees.${robloxUserId}.ratedBy`]: session.user.discordId,
       [`trainees.${robloxUserId}.ratedAt`]: new Date().toISOString(),
       [`trainees.${robloxUserId}.pendingAction`]: "ban",
+      [`trainees.${robloxUserId}.reason`]: reason || "",
     });
 
     if (banScope === "permanent") {
@@ -169,7 +173,7 @@ export async function POST(req, { params }) {
         .set({
           bannedBy: session.user.discordId,
           bannedAt: new Date().toISOString(),
-          reason: `Banned from training session ${id} (ride: ${data.rideCode})`,
+          reason: reason || `Banned from training session ${id} (ride: ${data.rideCode})`,
         });
     }
 
@@ -178,7 +182,7 @@ export async function POST(req, { params }) {
       robloxUserId: String(robloxUserId),
       username: data.trainees?.[robloxUserId]?.username || null,
       by: session.user.discordId,
-      meta: { banScope },
+      meta: { banScope, reason: reason || "" },
     });
   }
 
@@ -200,6 +204,7 @@ export async function POST(req, { params }) {
       // elsewhere. Both go through pendingAction so the panel/teleport
       // logic enforces the actual exit with the right message.
       [`trainees.${robloxUserId}.pendingAction`]: rating === "passed" ? "pass" : "fail",
+      [`trainees.${robloxUserId}.reason`]: reason || "",
     });
 
     // On pass, write the qualification onto the trainee's permanent record —

@@ -1,16 +1,35 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import StatusPill from "./StatusPill";
+import ConfirmDialog from "./ConfirmDialog";
 
 export default function SessionCard({ session, onAction }) {
   const [busy, setBusy] = useState(false);
-  const [selected, setSelected] = useState(null); // robloxUserId of opened detail
+  const [selected, setSelected] = useState(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [codeInput, setCodeInput] = useState(session.code);
   const [maxInput, setMaxInput] = useState(session.maxTrainees ?? "");
+  const [thumbnails, setThumbnails] = useState({});
+  const [pendingDialog, setPendingDialog] = useState(null);
 
   const trainees = Object.entries(session.trainees || {});
   const activeTrainees = trainees.filter(([, t]) => t.rank === "trainee");
+  const traineeIdsKey = trainees.map(([uid]) => uid).join(",");
+
+  useEffect(() => {
+    const ids = trainees.map(([uid]) => uid);
+    if (ids.length === 0) return;
+
+    fetch("/api/console/avatars", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userIds: ids }),
+    })
+      .then((res) => res.json())
+      .then((data) => setThumbnails((prev) => ({ ...prev, ...data.thumbnails })))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traineeIdsKey]);
 
   async function run(action, robloxUserId, extra) {
     setBusy(true);
@@ -25,6 +44,32 @@ export default function SessionCard({ session, onAction }) {
     setBusy(false);
     setConfigOpen(false);
   }
+
+  function openDialog(kind, robloxUserId) {
+    setPendingDialog({ kind, robloxUserId });
+  }
+
+  async function confirmDialog(reason) {
+    const { kind, robloxUserId } = pendingDialog;
+    setPendingDialog(null);
+
+    if (kind === "pass") {
+      await run("rate", robloxUserId, { rating: "passed" });
+    } else if (kind === "fail") {
+      await run("rate", robloxUserId, { rating: "failed", reason });
+    } else if (kind === "kick") {
+      await run("kick", robloxUserId, { reason });
+    } else if (kind === "ban-session") {
+      await run("ban", robloxUserId, { banScope: "session", reason });
+    } else if (kind === "ban-permanent") {
+      await run("ban", robloxUserId, { banScope: "permanent", reason });
+    } else if (kind === "end-session") {
+      await run("close");
+    }
+    setSelected(null);
+  }
+
+  const selectedTrainee = selected && session.trainees?.[selected];
 
   return (
     <div
@@ -54,12 +99,12 @@ export default function SessionCard({ session, onAction }) {
 
       <div style={{ fontSize: 13, color: "var(--mute)", marginBottom: 12 }}>
         Hosted by {session.hostUsername || session.hostRobloxId}
+        {session.coHostUsername && <> · co-host {session.coHostUsername}</>}
         {typeof session.maxTrainees === "number" && (
           <> · {activeTrainees.length}/{session.maxTrainees} trainees</>
         )}
       </div>
 
-      {/* Avatar row — click a face to open kick/ban/detail for that person */}
       {trainees.length > 0 && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           {trainees.map(([uid, t]) => (
@@ -74,15 +119,31 @@ export default function SessionCard({ session, onAction }) {
                 border: `2px solid ${selected === uid ? "var(--ink)" : "var(--line)"}`,
                 padding: 0,
                 overflow: "hidden",
-                background: "var(--paper)",
+                background: "var(--line)",
                 position: "relative",
               }}
             >
-              <img
-                src={`https://www.roblox.com/headshot-thumbnail/image?userId=${uid}&width=150&height=150&format=png`}
-                alt={t.username || uid}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
+              {thumbnails[uid] ? (
+                <img
+                  src={thumbnails[uid]}
+                  alt={t.username || uid}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: "var(--mute)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "100%",
+                    height: "100%",
+                  }}
+                >
+                  {(t.username || "?").slice(0, 2).toUpperCase()}
+                </span>
+              )}
               {t.inServer && (
                 <span
                   style={{
@@ -109,8 +170,7 @@ export default function SessionCard({ session, onAction }) {
         </div>
       )}
 
-      {/* Detail panel for the selected trainee */}
-      {selected && session.trainees?.[selected] && (
+      {selectedTrainee && (
         <div
           style={{
             border: "1px solid var(--line)",
@@ -121,11 +181,9 @@ export default function SessionCard({ session, onAction }) {
         >
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 14 }}>
-                {session.trainees[selected].username || selected}
-              </span>
-              <StatusPill value={session.trainees[selected].rank} />
-              {session.trainees[selected].inServer && (
+              <span style={{ fontSize: 14 }}>{selectedTrainee.username || selected}</span>
+              <StatusPill value={selectedTrainee.rank} />
+              {selectedTrainee.inServer && (
                 <span style={{ fontSize: 11, color: "var(--signal-green)" }}>in server now</span>
               )}
             </div>
@@ -139,44 +197,43 @@ export default function SessionCard({ session, onAction }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
               disabled={busy}
-              onClick={() => run("rate", selected, { rating: "passed" })}
+              onClick={() => openDialog("pass", selected)}
               style={btnStyle("var(--signal-green)")}
             >
               Pass
             </button>
             <button
               disabled={busy}
-              onClick={() => run("rate", selected, { rating: "failed" })}
+              onClick={() => openDialog("fail", selected)}
               style={btnStyle("var(--signal-red)")}
             >
               Fail
             </button>
-            <button disabled={busy} onClick={() => run("kick", selected)} style={btnStyle("var(--mute)")}>
+            <button disabled={busy} onClick={() => openDialog("kick", selected)} style={btnStyle("var(--mute)")}>
               Kick
             </button>
             <button
               disabled={busy}
-              onClick={() => run("ban", selected, { banScope: "session" })}
+              onClick={() => openDialog("ban-session", selected)}
               style={btnStyle("var(--signal-red)")}
             >
               Ban (this session)
             </button>
             <button
               disabled={busy}
-              onClick={() => run("ban", selected, { banScope: "permanent" })}
+              onClick={() => openDialog("ban-permanent", selected)}
               style={btnStyle("var(--signal-red)")}
             >
               Ban (permanent)
             </button>
           </div>
           <p style={{ fontSize: 11, color: "var(--mute)", margin: "8px 0 0" }}>
-            Kick/ban takes effect the next time this person interacts with a panel in-game —
+            Takes effect the next time this person interacts with a panel in-game —
             there's no instant push to Roblox.
           </p>
         </div>
       )}
 
-      {/* Session-level controls */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {session.status !== "locked" && (
           <button disabled={busy} onClick={() => run("lock")} style={outlineBtn}>
@@ -185,10 +242,10 @@ export default function SessionCard({ session, onAction }) {
         )}
         {session.status === "locked" && (
           <button disabled={busy} onClick={() => run("open")} style={outlineBtn}>
-            Reopen
+            Unlock
           </button>
         )}
-        <button disabled={busy} onClick={() => run("close")} style={outlineBtn}>
+        <button disabled={busy} onClick={() => openDialog("end-session", null)} style={outlineBtn}>
           End session
         </button>
         <button disabled={busy} onClick={() => run("teleport-all")} style={outlineBtn}>
@@ -232,6 +289,75 @@ export default function SessionCard({ session, onAction }) {
             Save
           </button>
         </div>
+      )}
+
+      {pendingDialog?.kind === "pass" && (
+        <ConfirmDialog
+          title="Confirm pass"
+          message={`Is ${selectedTrainee?.username || "this trainee"} prepared to operate this ride? Confirm only if they've completed the full training without skipping any steps.`}
+          confirmLabel="Pass"
+          confirmColor="var(--signal-green)"
+          onConfirm={confirmDialog}
+          onCancel={() => setPendingDialog(null)}
+        />
+      )}
+
+      {pendingDialog?.kind === "fail" && (
+        <ConfirmDialog
+          title="Confirm fail"
+          message={`Is ${selectedTrainee?.username || "this trainee"} not yet ready to operate this ride? They'll be told to retry in another session.`}
+          confirmLabel="Fail"
+          confirmColor="var(--signal-red)"
+          onConfirm={confirmDialog}
+          onCancel={() => setPendingDialog(null)}
+        />
+      )}
+
+      {pendingDialog?.kind === "kick" && (
+        <ConfirmDialog
+          title="Kick from session"
+          message={`${selectedTrainee?.username || "This trainee"} will be removed. This is recorded on their record and shown to them as the reason.`}
+          confirmLabel="Kick"
+          confirmColor="var(--mute)"
+          requireReason
+          onConfirm={confirmDialog}
+          onCancel={() => setPendingDialog(null)}
+        />
+      )}
+
+      {pendingDialog?.kind === "ban-session" && (
+        <ConfirmDialog
+          title="Ban from this session"
+          message={`${selectedTrainee?.username || "This trainee"} won't be able to rejoin THIS session. This is recorded and shown to them as the reason.`}
+          confirmLabel="Ban (session)"
+          confirmColor="var(--signal-red)"
+          requireReason
+          onConfirm={confirmDialog}
+          onCancel={() => setPendingDialog(null)}
+        />
+      )}
+
+      {pendingDialog?.kind === "ban-permanent" && (
+        <ConfirmDialog
+          title="Permanent ban"
+          message={`${selectedTrainee?.username || "This trainee"} won't be able to join ANY training session, ever, until manually unbanned. This is recorded and shown to them as the reason.`}
+          confirmLabel="Ban (permanent)"
+          confirmColor="var(--signal-red)"
+          requireReason
+          onConfirm={confirmDialog}
+          onCancel={() => setPendingDialog(null)}
+        />
+      )}
+
+      {pendingDialog?.kind === "end-session" && (
+        <ConfirmDialog
+          title="End this session?"
+          message="Everyone currently in the private server — including the host — will be teleported to a normal server. The session closes permanently and can't be reopened or rejoined."
+          confirmLabel="End session"
+          confirmColor="var(--signal-red)"
+          onConfirm={confirmDialog}
+          onCancel={() => setPendingDialog(null)}
+        />
       )}
     </div>
   );

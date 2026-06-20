@@ -49,6 +49,7 @@ export async function POST(req) {
 
   let practiceMode = false;
   let pendingAction = null;
+  let pendingActionReason = null;
   let pendingTeleport = null;
 
   if (sessionId) {
@@ -58,6 +59,7 @@ export async function POST(req) {
 
     if (trainee?.pendingAction) {
       pendingAction = trainee.pendingAction;
+      pendingActionReason = trainee.reason || null;
       // Clear it immediately so it only fires once.
       await db()
         .collection("sessions")
@@ -87,6 +89,7 @@ export async function POST(req) {
     qualified: qualified || practiceMode,
     practiceMode,
     pendingAction,
+    pendingActionReason,
     pendingTeleport,
   });
 }
