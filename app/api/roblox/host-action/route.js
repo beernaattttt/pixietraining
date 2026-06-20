@@ -9,13 +9,6 @@ const VALID_ACTIONS = ["lock", "open", "close", "rate", "kick", "ban"];
 const VALID_RATINGS = ["passed", "failed"];
 const VALID_BAN_SCOPES = ["session", "permanent"];
 
-/**
- * In-game equivalent of /api/console/sessions/[id] for the actions a
- * Host can do directly from the TrainerPanel without leaving Roblox.
- * Co-Host is explicitly NOT allowed to call this — Co-Host is teleport-
- * only, enforced here, not just in the panel's button visibility, since
- * the panel's gating is UX, not the security boundary.
- */
 export async function POST(req) {
   if (!verifyRobloxServer(req)) return unauthorized();
 
@@ -138,12 +131,12 @@ export async function POST(req) {
       [`trainees.${targetRobloxUserId}.reason`]: reason || "",
     });
 
-    if (rating === "passed") {
-      await db()
-        .collection("robloxUsers")
-        .doc(String(targetRobloxUserId))
-        .set({ qualifications: { [data.rideCode]: true } }, { merge: true });
-    }
+    // Same fix as the web console's session-action route: Fail must
+    // explicitly revoke a previous Pass, not just skip writing anything.
+    await db()
+      .collection("robloxUsers")
+      .doc(String(targetRobloxUserId))
+      .set({ qualifications: { [data.rideCode]: rating === "passed" } }, { merge: true });
 
     await appendSessionEvent(sessionId, {
       type: rating,
