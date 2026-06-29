@@ -3,7 +3,6 @@ import { verifyRobloxServer, unauthorized } from "../../../../lib/verifyRoblox";
 import { rateLimit, tooManyRequests } from "../../../../lib/rateLimit";
 import { audit } from "../../../../lib/audit";
 import { notifyDiscordBot } from "../../../../lib/notifyDiscordBot";
-import { waitUntil } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -98,23 +97,22 @@ export async function POST(req) {
     meta: { code, rideCode },
   });
 
-  // Fire-and-forget: tell the Discord bot a new training opened so it can
-  // post the announcement embed. Wrapped in waitUntil so Vercel keeps the
-  // function alive long enough to finish this background call even though
-  // the response above has already been sent — without it, Vercel can
-  // freeze/kill the function as soon as it returns, cancelling this fetch
-  // mid-flight regardless of notifyDiscordBot's own internal timeout.
-  waitUntil(
-    notifyDiscordBot({
-      type: "session-opened",
-      sessionId: ref.id,
-      code,
-      rideCode,
-      rideName: rideSnap.data()?.name || rideCode,
-      hostUsername: hostUsername || "",
-      maxTrainees: typeof maxTrainees === "number" && maxTrainees > 0 ? maxTrainees : null,
-    }),
-  );
+  // Tell the Discord bot a new training opened so it can post the
+  // announcement embed. Awaited (not true fire-and-forget): Vercel's App
+  // Router runtime here doesn't support next/server's waitUntil, and an
+  // un-awaited promise risks being killed mid-flight as soon as the function
+  // returns. notifyDiscordBot still swallows its own errors internally
+  // (25s timeout) so a slow/down bot delays this response by at most ~25s
+  // but never fails the training flow itself.
+  await notifyDiscordBot({
+    type: "session-opened",
+    sessionId: ref.id,
+    code,
+    rideCode,
+    rideName: rideSnap.data()?.name || rideCode,
+    hostUsername: hostUsername || "",
+    maxTrainees: typeof maxTrainees === "number" && maxTrainees > 0 ? maxTrainees : null,
+  });
 
   return Response.json({ sessionId: ref.id });
 }
