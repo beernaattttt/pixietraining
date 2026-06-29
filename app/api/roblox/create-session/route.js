@@ -97,11 +97,14 @@ export async function POST(req) {
     meta: { code, rideCode },
   });
 
-  // Fire-and-forget: tell the Discord bot a new training opened so it can
-  // post the announcement embed. Never awaited-and-blocking in a way that
-  // could delay the response to the Roblox game server — notifyDiscordBot
-  // already swallows its own errors and has a 5s internal timeout.
-  notifyDiscordBot({
+  // Tell the Discord bot a new training opened so it can post the
+  // announcement embed. Awaited (not true fire-and-forget): Vercel's App
+  // Router runtime here doesn't support next/server's waitUntil, and an
+  // un-awaited promise risks being killed mid-flight as soon as the function
+  // returns. notifyDiscordBot still swallows its own errors internally
+  // (25s timeout) so a slow/down bot delays this response by at most ~25s
+  // but never fails the training flow itself.
+  await notifyDiscordBot({
     type: "session-opened",
     sessionId: ref.id,
     code,
