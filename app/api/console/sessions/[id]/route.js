@@ -3,7 +3,6 @@ import { requireConsoleAccess, forbidden } from "../../../../../lib/requireAuth"
 import { audit } from "../../../../../lib/audit";
 import { appendSessionEvent } from "../../../../../lib/sessionEvents";
 import { notifyDiscordBot } from "../../../../../lib/notifyDiscordBot";
-import { waitUntil } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -60,14 +59,13 @@ export async function POST(req, { params }) {
     });
 
     // Let the Discord embed reflect the new status immediately rather than
-    // waiting for the bot's next poll cycle.
-    waitUntil(
-      notifyDiscordBot({
-        type: "session-status-changed",
-        sessionId: id,
-        status: statusMap[action],
-      }),
-    );
+    // waiting for the bot's next poll cycle. Awaited for the same reason as
+    // create-session: waitUntil isn't available in this runtime.
+    await notifyDiscordBot({
+      type: "session-status-changed",
+      sessionId: id,
+      status: statusMap[action],
+    });
   }
 
   if (action === "configure") {
