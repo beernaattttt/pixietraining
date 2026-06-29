@@ -2,6 +2,7 @@ import { db } from "../../../../../lib/firebaseAdmin";
 import { requireConsoleAccess, forbidden } from "../../../../../lib/requireAuth";
 import { audit } from "../../../../../lib/audit";
 import { appendSessionEvent } from "../../../../../lib/sessionEvents";
+import { notifyDiscordBot } from "../../../../../lib/notifyDiscordBot";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,14 @@ export async function POST(req, { params }) {
       robloxUserId: null,
       username: null,
       by: session.user.discordId,
+    });
+
+    // Let the Discord embed reflect the new status immediately rather than
+    // waiting for the bot's next poll cycle.
+    notifyDiscordBot({
+      type: "session-status-changed",
+      sessionId: id,
+      status: statusMap[action],
     });
   }
 

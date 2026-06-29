@@ -2,6 +2,7 @@ import { db } from "../../../../lib/firebaseAdmin";
 import { verifyRobloxServer, unauthorized } from "../../../../lib/verifyRoblox";
 import { rateLimit, tooManyRequests } from "../../../../lib/rateLimit";
 import { audit } from "../../../../lib/audit";
+import { notifyDiscordBot } from "../../../../lib/notifyDiscordBot";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +95,20 @@ export async function POST(req) {
     action: "create-session",
     target: ref.id,
     meta: { code, rideCode },
+  });
+
+  // Fire-and-forget: tell the Discord bot a new training opened so it can
+  // post the announcement embed. Never awaited-and-blocking in a way that
+  // could delay the response to the Roblox game server — notifyDiscordBot
+  // already swallows its own errors and has a 5s internal timeout.
+  notifyDiscordBot({
+    type: "session-opened",
+    sessionId: ref.id,
+    code,
+    rideCode,
+    rideName: rideSnap.data()?.name || rideCode,
+    hostUsername: hostUsername || "",
+    maxTrainees: typeof maxTrainees === "number" && maxTrainees > 0 ? maxTrainees : null,
   });
 
   return Response.json({ sessionId: ref.id });
