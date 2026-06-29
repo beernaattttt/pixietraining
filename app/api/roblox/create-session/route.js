@@ -3,6 +3,7 @@ import { verifyRobloxServer, unauthorized } from "../../../../lib/verifyRoblox";
 import { rateLimit, tooManyRequests } from "../../../../lib/rateLimit";
 import { audit } from "../../../../lib/audit";
 import { notifyDiscordBot } from "../../../../lib/notifyDiscordBot";
+import { waitUntil } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -98,18 +99,22 @@ export async function POST(req) {
   });
 
   // Fire-and-forget: tell the Discord bot a new training opened so it can
-  // post the announcement embed. Never awaited-and-blocking in a way that
-  // could delay the response to the Roblox game server — notifyDiscordBot
-  // already swallows its own errors and has a 5s internal timeout.
-  notifyDiscordBot({
-    type: "session-opened",
-    sessionId: ref.id,
-    code,
-    rideCode,
-    rideName: rideSnap.data()?.name || rideCode,
-    hostUsername: hostUsername || "",
-    maxTrainees: typeof maxTrainees === "number" && maxTrainees > 0 ? maxTrainees : null,
-  });
+  // post the announcement embed. Wrapped in waitUntil so Vercel keeps the
+  // function alive long enough to finish this background call even though
+  // the response above has already been sent — without it, Vercel can
+  // freeze/kill the function as soon as it returns, cancelling this fetch
+  // mid-flight regardless of notifyDiscordBot's own internal timeout.
+  waitUntil(
+    notifyDiscordBot({
+      type: "session-opened",
+      sessionId: ref.id,
+      code,
+      rideCode,
+      rideName: rideSnap.data()?.name || rideCode,
+      hostUsername: hostUsername || "",
+      maxTrainees: typeof maxTrainees === "number" && maxTrainees > 0 ? maxTrainees : null,
+    }),
+  );
 
   return Response.json({ sessionId: ref.id });
 }
